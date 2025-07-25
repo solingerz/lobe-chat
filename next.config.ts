@@ -10,8 +10,6 @@ const isDesktop = process.env.NEXT_PUBLIC_IS_DESKTOP_APP === '1';
 const enableReactScan = !!process.env.REACT_SCAN_MONITOR_API_KEY;
 const isUsePglite = process.env.NEXT_PUBLIC_CLIENT_DB === 'pglite';
 
-// if you need to proxy the api endpoint to remote server
-
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH;
 const isStandaloneMode = buildWithDocker || isDesktop;
 
@@ -33,10 +31,11 @@ const nextConfig: NextConfig = {
       '@lobehub/ui',
       'gpt-tokenizer',
     ],
+    // 添加 webpack 内存优化配置来解决构建内存问题
+    webpackMemoryOptimizations: true,
     // oidc provider depend on constructor.name
     // but swc minification will remove the name
     // so we need to disable it
-    // refs: https://github.com/lobehub/lobe-chat/pull/7430
     serverMinification: false,
     webVitalsAttribution: ['CLS', 'LCP'],
   },
@@ -232,22 +231,13 @@ const nextConfig: NextConfig = {
       permanent: true,
       source: '/welcome',
     },
-    // TODO: 等 V2 做强制跳转吧
-    // {
-    //   destination: '/settings/provider/volcengine',
-    //   permanent: true,
-    //   source: '/settings/provider/doubao',
-    // },
-    // we need back /repos url in the further
     {
       destination: '/files',
       permanent: false,
       source: '/repos',
     },
   ],
-  // when external packages in dev mode with turbopack, this config will lead to bundle error
   serverExternalPackages: isProd ? ['@electric-sql/pglite'] : undefined,
-
   transpilePackages: ['pdfjs-dist', 'mermaid'],
 
   webpack(config) {
@@ -262,7 +252,6 @@ const nextConfig: NextConfig = {
     }
 
     // to fix shikiji compile error
-    // refs: https://github.com/antfu/shikiji/issues/23
     config.module.rules.push({
       resolve: {
         fullySpecified: false,
@@ -276,12 +265,11 @@ const nextConfig: NextConfig = {
 
     config.resolve.alias.canvas = false;
 
-    // to ignore epub2 compile error
-    // refs: https://github.com/lobehub/lobe-chat/discussions/6769
     config.resolve.fallback = {
       ...config.resolve.fallback,
       zipfile: false,
     };
+
     return config;
   },
 };
@@ -307,37 +295,15 @@ const withSentry =
           c,
           {
             org: process.env.SENTRY_ORG,
-
             project: process.env.SENTRY_PROJECT,
-            // For all available options, see:
-            // https://github.com/getsentry/sentry-webpack-plugin#options
-            // Suppresses source map uploading logs during build
             silent: true,
           },
           {
-            // Enables automatic instrumentation of Vercel Cron Monitors.
-            // See the following for more information:
-            // https://docs.sentry.io/product/crons/
-            // https://vercel.com/docs/cron-jobs
             automaticVercelMonitors: true,
-
-            // Automatically tree-shake Sentry logger statements to reduce bundle size
             disableLogger: true,
-
-            // Hides source maps from generated client bundles
             hideSourceMaps: true,
-
-            // Transpiles SDK to be compatible with IE11 (increases bundle size)
             transpileClientSDK: true,
-
-            // Routes browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers. (increases server load)
-            // Note: Check that the configured route will not match with your Next.js middleware, otherwise reporting of client-
-            // side errors will fail.
             tunnelRoute: '/monitoring',
-
-            // For all available options, see:
-            // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
-            // Upload a larger set of source maps for prettier stack traces (increases build time)
             widenClientFileUpload: true,
           },
         )
